@@ -4,13 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aesthetic Sudoku | Premium Experience</title>
-    <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
-    <!-- Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- 3D Engine -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- YouTube IFrame API for music control -->
     <script src="https://www.youtube.com/iframe_api"></script>
     
     <style>
@@ -288,7 +284,6 @@
 
     <div id="canvas-container"></div>
 
-    <!-- Title Screen -->
     <div id="screen-title" class="screen active">
         <h1>Sudoku</h1>
         <div style="display: flex; flex-direction: column; align-items: center;">
@@ -297,7 +292,6 @@
         </div>
     </div>
 
-    <!-- Difficulty Screen -->
     <div id="screen-difficulty" class="screen">
         <h2 style="font-family: 'Playfair Display'; font-size: 2.5rem; margin-bottom: 2rem;">Choose Difficulty</h2>
         <div class="diff-card" onclick="startGame('easy')">
@@ -315,7 +309,6 @@
         <button class="btn btn-outline" onclick="showScreen('title')">Back</button>
     </div>
 
-    <!-- Main Game Screen -->
     <div id="screen-game" class="screen">
         <div class="game-header">
             <div class="stats-pill"><i data-lucide="timer" size="18"></i> <span id="timer">00:00</span></div>
@@ -328,13 +321,11 @@
 
         <div class="sudoku-container">
             <div class="grid" id="sudoku-grid">
-                <!-- Grid Cells via JS -->
-            </div>
+                </div>
         </div>
 
         <div class="numpad" id="numpad">
-            <!-- Buttons 1-9 via JS -->
-        </div>
+            </div>
 
         <div class="actions">
             <button class="action-btn" onclick="undoMove()">
@@ -349,7 +340,23 @@
         </div>
     </div>
 
-    <!-- Settings Overlay -->
+    <div id="screen-win" class="screen">
+        <h1 style="font-size: 3.5rem; margin-bottom: 1rem;">Masterpiece</h1>
+        <div class="stats-pill" style="justify-content: center; margin: 0 auto 2rem auto; width: fit-content; border: 1px solid var(--accent);">
+            <i data-lucide="award" size="20" style="color: var(--accent);"></i>
+            <span>Puzzle Solved</span>
+        </div>
+        <div style="margin-bottom: 3rem; background: var(--glass); padding: 2rem; border-radius: 20px; backdrop-filter: blur(10px);">
+            <p style="margin-bottom: 10px; font-weight: 300;">Completion Time</p>
+            <h2 id="final-time" style="font-size: 2.5rem; font-family: 'Playfair Display'; margin-bottom: 20px;">00:00</h2>
+            <p style="font-weight: 300;">Current Streak: <strong id="final-streak">0</strong></p>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <button class="btn" onclick="showScreen('difficulty')">New Game</button>
+            <button class="btn btn-outline" onclick="showScreen('title')">Main Menu</button>
+        </div>
+    </div>
+
     <div id="settings-overlay">
         <div class="settings-card">
             <h2 style="font-family: 'Playfair Display'; margin-bottom: 1.5rem;">Settings</h2>
@@ -438,6 +445,7 @@
         const showScreen = (id) => {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById('screen-' + id).classList.add('active');
+            lucide.createIcons();
         };
 
         const toggleSettings = (show) => {
@@ -540,15 +548,12 @@
         };
 
         const generateSudoku = (difficulty) => {
-            // Basic valid Sudoku generator (Shift-based)
             let base = [
                 [1,2,3,4,5,6,7,8,9], [4,5,6,7,8,9,1,2,3], [7,8,9,1,2,3,4,5,6],
                 [2,3,1,5,6,4,8,9,7], [5,6,4,8,9,7,2,3,1], [8,9,7,2,3,1,5,6,4],
                 [3,1,2,6,4,5,9,7,8], [6,4,5,9,7,8,3,1,2], [9,7,8,3,1,2,6,4,5]
             ];
             
-            // Shuffle Logic
-            const shuffle = (arr) => arr.sort(() => Math.random() - 0.5);
             solution = base.map(row => [...row]);
             
             let holes = difficulty === 'easy' ? 30 : difficulty === 'normal' ? 45 : 60;
@@ -599,7 +604,6 @@
             const index = r * 9 + c;
             cells[index].classList.add('selected');
             
-            // Highlight row and column
             for(let i=0; i<9; i++) {
                 cells[r * 9 + i].classList.add('related');
                 cells[i * 9 + c].classList.add('related');
@@ -612,9 +616,8 @@
             if(initialMask[r][c]) return;
 
             const prevValue = displayGrid[r][c];
-            if(prevValue === num) return; // avoid unnecessary history entries
+            if(prevValue === num) return; 
 
-            // Keep history for undo
             undoStack.push({ r, c, prev: prevValue });
 
             displayGrid[r][c] = num;
@@ -622,7 +625,6 @@
             const cellEl = document.querySelectorAll('.cell')[r * 9 + c];
             cellEl.innerText = num === 0 ? '' : num;
 
-            // Mistake Detection
             const highlightOn = document.getElementById('toggle-mistakes').classList.contains('on');
             if(highlightOn && num !== 0 && num !== solution[r][c]) {
                 cellEl.classList.add('error');
@@ -638,8 +640,15 @@
                 clearInterval(timerInterval);
                 streak++;
                 localStorage.setItem('sudoku-streak', streak);
-                alert("✨ Masterpiece! Sudoku Solved! ✨");
-                location.reload();
+                
+                // Set Win Screen Stats
+                document.getElementById('final-time').innerText = document.getElementById('timer').innerText;
+                document.getElementById('final-streak').innerText = streak;
+                document.getElementById('streak-val').innerText = streak;
+
+                setTimeout(() => {
+                    showScreen('win');
+                }, 500);
             }
         };
 
@@ -654,18 +663,10 @@
             renderGrid();
             showScreen('game');
 
-            // Start background music
             if (ytPlayer && ytPlayer.playVideo) {
                 ytPlayer.playVideo();
                 setMusicVolume(musicVolume);
-            } else {
-                // Fallback: set iframe src for basic autoplay support
-                const musicEl = document.getElementById('bg-music');
-                if (musicEl) {
-                    musicEl.src = 'https://www.youtube.com/embed/9kzE8isXlQY?autoplay=1&loop=1&playlist=9kzE8isXlQY&controls=0&modestbranding=1';
-                }
             }
-
             startTimer();
         };
 
@@ -688,7 +689,6 @@
             lucide.createIcons();
         };
 
-        // Initialize Numpad
         const numpad = document.getElementById('numpad');
         for(let i=1; i<=9; i++) {
             const btn = document.createElement('button');
@@ -698,20 +698,14 @@
             numpad.appendChild(btn);
         }
 
-        // Action Handlers
         const eraseCell = () => inputNumber(0);
         const undoMove = () => {
-            if(undoStack.length === 0) {
-                alert('No moves to undo.');
-                return;
-            }
+            if(undoStack.length === 0) return;
             const {r, c, prev} = undoStack.pop();
             displayGrid[r][c] = prev;
-
             const cellEl = document.querySelectorAll('.cell')[r * 9 + c];
             cellEl.innerText = prev === 0 ? '' : prev;
 
-            // Re-check mistake highlighting on undo
             const highlightOn = document.getElementById('toggle-mistakes').classList.contains('on');
             if(highlightOn && prev !== 0 && prev !== solution[r][c]) {
                 cellEl.classList.add('error');
@@ -725,7 +719,6 @@
             inputNumber(solution[r][c]);
         };
 
-        // Boot
         window.onload = () => {
             initThree();
             lucide.createIcons();
@@ -748,7 +741,6 @@
                 musicSlider.oninput = (e) => setMusicVolume(e.target.value);
             }
 
-            // Ensure music can start after a user gesture (some browsers block autoplay)
             const attemptPlay = () => {
                 if (ytPlayer && ytPlayer.playVideo) {
                     ytPlayer.playVideo();
