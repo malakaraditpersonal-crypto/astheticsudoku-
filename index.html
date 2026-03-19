@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aesthetic Sudoku | Premium Experience</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- 3D Engine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- YouTube IFrame API for music control -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+    
+    <style>
+        :root {
+            --bg-light: #F5F5DC;
+            --bg-dark: #2C1B12;
+            --primary: #3E2723;
+            --secondary: #D2B48C;
+            --accent: #D4AF37;
+            --text-main: #3E2723;
+            --glass: rgba(255, 255, 255, 0.2);
+            --transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-main);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.6;
+        }
+
+        /* --- UI Screens --- */
+        .screen {
+            position: absolute;
+            width: 100%;
+            max-width: 500px;
+            padding: 2rem;
+            text-align: center;
+            transition: var(--transition);
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(20px) scale(0.95);
+        }
+
+        .screen.active {
+            opacity: 1;
+            pointer-events: all;
+            transform: translateY(0) scale(1);
+        }
+
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 5rem;
+            color: var(--primary);
+            margin-bottom: 2rem;
+            letter-spacing: -2px;
+        }
+
+        /* --- Buttons --- */
+        .btn {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            padding: 1.2rem 3rem;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 10px 20px rgba(62, 39, 35, 0.2);
+            margin: 0.5rem;
+            display: inline-block;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 15px 30px rgba(62, 39, 35, 0.3);
+            background: #4E342E;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+        }
+
+        /* --- Difficulty Buttons --- */
+        .diff-card {
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .diff-card:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* --- Game Layout --- */
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding: 0 10px;
+        }
+
+        .stats-pill {
+            background: var(--glass);
+            padding: 0.5rem 1.2rem;
+            border-radius: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+
+        /* --- Sudoku Grid (3D Effect) --- */
+        .sudoku-container {
+            perspective: 1000px;
+            margin-bottom: 2rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            background: var(--primary);
+            border: 3px solid var(--primary);
+            gap: 1px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+            transform: rotateX(5deg);
+            transition: var(--transition);
+        }
+
+        .cell {
+            aspect-ratio: 1;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            user-select: none;
+        }
+
+        .cell:hover { background: #FDFCF0; }
+        .cell.selected { background: var(--accent) !important; color: white; }
+        .cell.related { background: #F2EFE9; }
+        .cell.initial { font-weight: 800; color: #000; }
+        .cell.error { color: #d32f2f; background: #ffebee; }
+
+        /* Thick borders for 3x3 blocks */
+        .cell:nth-child(3n) { border-right: 2px solid var(--primary); }
+        .cell:nth-child(9n) { border-right: none; }
+        .row-sep { border-bottom: 2px solid var(--primary); }
+
+        /* --- Controls --- */
+        .numpad {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            gap: 5px;
+            margin-bottom: 1.5rem;
+        }
+
+        .num-btn {
+            aspect-ratio: 1;
+            border-radius: 8px;
+            border: none;
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .num-btn:active { transform: scale(0.9); }
+
+        .actions {
+            display: flex;
+            justify-content: space-around;
+            gap: 10px;
+        }
+
+        .action-btn {
+            background: var(--glass);
+            border: none;
+            padding: 0.8rem;
+            border-radius: 15px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.7rem;
+            gap: 5px;
+            flex: 1;
+        }
+
+        /* --- Settings Overlay --- */
+        #settings-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(44, 27, 18, 0.8);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .settings-card {
+            background: var(--bg-light);
+            width: 90%;
+            max-width: 400px;
+            padding: 2rem;
+            border-radius: 30px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+        /* --- Switch --- */
+        .switch {
+            width: 50px;
+            height: 26px;
+            background: #ccc;
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .switch.on { background: var(--accent); }
+        .switch::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: 0.3s;
+        }
+        .switch.on::after { left: 27px; }
+
+        .streak-fire { color: #E65100; animation: flicker 1s infinite alternate; }
+        @keyframes flicker { from { opacity: 0.8; transform: scale(1); } to { opacity: 1; transform: scale(1.1); } }
+
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <!-- Title Screen -->
+    <div id="screen-title" class="screen active">
+        <h1>Sudoku</h1>
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <button class="btn" onclick="showScreen('difficulty')">Play Game</button>
+            <button class="btn btn-outline" onclick="window.close()">Quit</button>
+        </div>
+    </div>
+
+    <!-- Difficulty Screen -->
+    <div id="screen-difficulty" class="screen">
+        <h2 style="font-family: 'Playfair Display'; font-size: 2.5rem; margin-bottom: 2rem;">Choose Difficulty</h2>
+        <div class="diff-card" onclick="startGame('easy')">
+            <h3>Easy</h3>
+            <p>Relaxing and simple puzzles.</p>
+        </div>
+        <div class="diff-card" onclick="startGame('normal')">
+            <h3>Normal</h3>
+            <p>The perfect daily challenge.</p>
+        </div>
+        <div class="diff-card" onclick="startGame('hard')">
+            <h3>Hard</h3>
+            <p>For Sudoku masters only.</p>
+        </div>
+        <button class="btn btn-outline" onclick="showScreen('title')">Back</button>
+    </div>
+
+    <!-- Main Game Screen -->
+    <div id="screen-game" class="screen">
+        <div class="game-header">
+            <div class="stats-pill"><i data-lucide="timer" size="18"></i> <span id="timer">00:00</span></div>
+            <div class="stats-pill"><span class="streak-fire"><i data-lucide="flame" size="18"></i></span> <span id="streak-val">0</span></div>
+            <div style="display: flex; gap: 8px;">
+                <button class="action-btn" style="flex:none" onclick="togglePause()"><i data-lucide="pause" id="pause-icon"></i></button>
+                <button class="action-btn" style="flex:none" onclick="toggleSettings(true)"><i data-lucide="settings"></i></button>
+            </div>
+        </div>
+
+        <div class="sudoku-container">
+            <div class="grid" id="sudoku-grid">
+                <!-- Grid Cells via JS -->
+            </div>
+        </div>
+
+        <div class="numpad" id="numpad">
+            <!-- Buttons 1-9 via JS -->
+        </div>
+
+        <div class="actions">
+            <button class="action-btn" onclick="undoMove()">
+                <i data-lucide="rotate-ccw"></i> Undo
+            </button>
+            <button class="action-btn" onclick="eraseCell()">
+                <i data-lucide="eraser"></i> Erase
+            </button>
+            <button class="action-btn" onclick="getHint()">
+                <i data-lucide="lightbulb"></i> Hint
+            </button>
+        </div>
+    </div>
+
+    <!-- Settings Overlay -->
+    <div id="settings-overlay">
+        <div class="settings-card">
+            <h2 style="font-family: 'Playfair Display'; margin-bottom: 1.5rem;">Settings</h2>
+            <div class="setting-row">
+                <span>Sound Effects</span>
+                <div class="switch on" id="toggle-sfx" onclick="toggleSfx()"></div>
+            </div>
+            <div class="setting-row">
+                <span>SFX Volume</span>
+                <input id="sfx-volume" type="range" min="0" max="100" value="80" />
+            </div>
+            <div class="setting-row">
+                <span>Music Volume</span>
+                <input id="music-volume" type="range" min="0" max="100" value="50" />
+            </div>
+            <div class="setting-row">
+                <span>Mistake Highlight</span>
+                <div class="switch on" id="toggle-mistakes" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="setting-row">
+                <span>Dark Mode</span>
+                <div class="switch" id="toggle-dark" onclick="toggleDarkMode()"></div>
+            </div>
+            <button class="btn" style="width: 100%; margin-top: 2rem;" onclick="toggleSettings(false)">Close</button>
+            <button class="btn btn-outline" style="width: 100%; margin-top: 0.5rem;" onclick="location.reload()">Restart Game</button>
+        </div>
+    </div>
+
+    <script>
+        /* --- THREE.JS BACKGROUND --- */
+        const initThree = () => {
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            const cubes = [];
+            for(let i=0; i<15; i++) {
+                const material = new THREE.MeshBasicMaterial({ 
+                    color: 0xD2B48C, 
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.3
+                });
+                const cube = new THREE.Mesh(geometry, material);
+                cube.position.set(Math.random()*10-5, Math.random()*10-5, Math.random()*10-5);
+                cube.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, 0);
+                scene.add(cube);
+                cubes.push(cube);
+            }
+
+            camera.position.z = 5;
+
+            function animate() {
+                requestAnimationFrame(animate);
+                cubes.forEach(c => {
+                    c.rotation.x += 0.002;
+                    c.rotation.y += 0.002;
+                });
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        };
+
+        /* --- GAME LOGIC --- */
+        let solution = [];
+        let displayGrid = [];
+        let initialMask = [];
+        let selectedCell = null;
+        let undoStack = [];
+        let timerInterval;
+        let seconds = 0;
+        let isPaused = false;
+        let streak = localStorage.getItem('sudoku-streak') || 0;
+
+        document.getElementById('streak-val').innerText = streak;
+
+        const showScreen = (id) => {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById('screen-' + id).classList.add('active');
+        };
+
+        const toggleSettings = (show) => {
+            document.getElementById('settings-overlay').style.display = show ? 'flex' : 'none';
+        };
+
+        const toggleSfx = () => {
+            const el = document.getElementById('toggle-sfx');
+            if (!el) return;
+            const enabled = el.classList.toggle('on');
+            localStorage.setItem('sfxEnabled', enabled);
+        };
+
+        let audioCtx;
+        let uiVolume = Number(localStorage.getItem('sfxVolume') ?? 80) / 100;
+        let musicVolume = Number(localStorage.getItem('musicVolume') ?? 50);
+        let ytPlayer = null;
+
+        const ensureAudioContext = () => {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            return audioCtx;
+        };
+
+        const setSfxVolume = (value) => {
+            uiVolume = value / 100;
+            localStorage.setItem('sfxVolume', value);
+        };
+
+        const setMusicVolume = (value) => {
+            musicVolume = value;
+            localStorage.setItem('musicVolume', value);
+            if (ytPlayer && ytPlayer.setVolume) {
+                ytPlayer.setVolume(value);
+            }
+        };
+
+        const playUISound = () => {
+            const sfxEnabled = document.getElementById('toggle-sfx')?.classList.contains('on');
+            if (!sfxEnabled || uiVolume <= 0) return;
+
+            const ctx = ensureAudioContext();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(600, ctx.currentTime);
+            gain.gain.setValueAtTime(0.001, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(uiVolume, ctx.currentTime + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.2);
+        };
+
+        document.addEventListener('click', (event) => {
+            const target = event.target;
+            if (target.closest('button') || target.closest('.diff-card') || target.closest('.cell') || target.closest('.switch')) {
+                playUISound();
+            }
+        });
+
+        function onYouTubeIframeAPIReady() {
+            ytPlayer = new YT.Player('bg-music', {
+                height: '0',
+                width: '0',
+                videoId: '9kzE8isXlQY',
+                playerVars: {
+                    autoplay: 0,
+                    loop: 1,
+                    playlist: '9kzE8isXlQY',
+                    controls: 0,
+                    modestbranding: 1,
+                    disablekb: 1,
+                    rel: 0,
+                    iv_load_policy: 3
+                },
+                events: {
+                    onReady: (event) => {
+                        setMusicVolume(musicVolume);
+                    }
+                }
+            });
+        }
+
+        const toggleDarkMode = () => {
+            const isDark = document.getElementById('toggle-dark').classList.toggle('on');
+            document.body.classList.toggle('dark-mode', isDark);
+
+            document.body.style.setProperty('--bg-light', isDark ? '#1A0F0A' : '#F5F5DC');
+            document.body.style.setProperty('--text-main', isDark ? '#F5F5DC' : '#3E2723');
+            document.body.style.setProperty('--primary', isDark ? '#B58764' : '#3E2723');
+            document.body.style.setProperty('--secondary', isDark ? '#D6B490' : '#D2B48C');
+            document.body.style.setProperty('--accent', isDark ? '#F2D16B' : '#D4AF37');
+            document.body.style.setProperty('--glass', isDark ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.2)');
+
+            document.querySelectorAll('.cell').forEach(c => {
+                const isInitial = c.classList.contains('initial');
+                c.style.color = isInitial ? (isDark ? '#F5F5DC' : '#000') : (isDark ? '#F5F5DC' : '#000');
+                c.style.background = isDark ? '#2F2318' : '#fff';
+            });
+        };
+
+        const generateSudoku = (difficulty) => {
+            // Basic valid Sudoku generator (Shift-based)
+            let base = [
+                [1,2,3,4,5,6,7,8,9], [4,5,6,7,8,9,1,2,3], [7,8,9,1,2,3,4,5,6],
+                [2,3,1,5,6,4,8,9,7], [5,6,4,8,9,7,2,3,1], [8,9,7,2,3,1,5,6,4],
+                [3,1,2,6,4,5,9,7,8], [6,4,5,9,7,8,3,1,2], [9,7,8,3,1,2,6,4,5]
+            ];
+            
+            // Shuffle Logic
+            const shuffle = (arr) => arr.sort(() => Math.random() - 0.5);
+            solution = base.map(row => [...row]);
+            
+            let holes = difficulty === 'easy' ? 30 : difficulty === 'normal' ? 45 : 60;
+            displayGrid = solution.map(row => [...row]);
+            initialMask = Array(9).fill().map(() => Array(9).fill(false));
+
+            let count = 0;
+            while(count < holes) {
+                let r = Math.floor(Math.random()*9);
+                let c = Math.floor(Math.random()*9);
+                if(displayGrid[r][c] !== 0) {
+                    displayGrid[r][c] = 0;
+                    count++;
+                }
+            }
+
+            for(let r=0; r<9; r++) {
+                for(let c=0; c<9; c++) {
+                    if(displayGrid[r][c] !== 0) initialMask[r][c] = true;
+                }
+            }
+        };
+
+        const renderGrid = () => {
+            const gridEl = document.getElementById('sudoku-grid');
+            gridEl.innerHTML = '';
+            for(let r=0; r<9; r++) {
+                for(let c=0; c<9; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    if(r === 2 || r === 5) cell.classList.add('row-sep');
+                    if(initialMask[r][c]) cell.classList.add('initial');
+                    
+                    cell.innerText = displayGrid[r][c] === 0 ? '' : displayGrid[r][c];
+                    
+                    cell.onclick = () => selectCell(r, c);
+                    gridEl.appendChild(cell);
+                }
+            }
+            lucide.createIcons();
+        };
+
+        const selectCell = (r, c) => {
+            selectedCell = {r, c};
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(el => el.classList.remove('selected', 'related'));
+            
+            const index = r * 9 + c;
+            cells[index].classList.add('selected');
+            
+            // Highlight row and column
+            for(let i=0; i<9; i++) {
+                cells[r * 9 + i].classList.add('related');
+                cells[i * 9 + c].classList.add('related');
+            }
+        };
+
+        const inputNumber = (num) => {
+            if(!selectedCell || isPaused) return;
+            const {r, c} = selectedCell;
+            if(initialMask[r][c]) return;
+
+            const prevValue = displayGrid[r][c];
+            if(prevValue === num) return; // avoid unnecessary history entries
+
+            // Keep history for undo
+            undoStack.push({ r, c, prev: prevValue });
+
+            displayGrid[r][c] = num;
+            
+            const cellEl = document.querySelectorAll('.cell')[r * 9 + c];
+            cellEl.innerText = num === 0 ? '' : num;
+
+            // Mistake Detection
+            const highlightOn = document.getElementById('toggle-mistakes').classList.contains('on');
+            if(highlightOn && num !== 0 && num !== solution[r][c]) {
+                cellEl.classList.add('error');
+            } else {
+                cellEl.classList.remove('error');
+            }
+
+            checkWin();
+        };
+
+        const checkWin = () => {
+            if(JSON.stringify(displayGrid) === JSON.stringify(solution)) {
+                clearInterval(timerInterval);
+                streak++;
+                localStorage.setItem('sudoku-streak', streak);
+                alert("✨ Masterpiece! Sudoku Solved! ✨");
+                location.reload();
+            }
+        };
+
+        const startGame = (diff) => {
+            clearInterval(timerInterval);
+            seconds = 0;
+            document.getElementById('timer').innerText = '00:00';
+            undoStack = [];
+            selectedCell = null;
+
+            generateSudoku(diff);
+            renderGrid();
+            showScreen('game');
+
+            // Start background music
+            if (ytPlayer && ytPlayer.playVideo) {
+                ytPlayer.playVideo();
+                setMusicVolume(musicVolume);
+            } else {
+                // Fallback: set iframe src for basic autoplay support
+                const musicEl = document.getElementById('bg-music');
+                if (musicEl) {
+                    musicEl.src = 'https://www.youtube.com/embed/9kzE8isXlQY?autoplay=1&loop=1&playlist=9kzE8isXlQY&controls=0&modestbranding=1';
+                }
+            }
+
+            startTimer();
+        };
+
+        const startTimer = () => {
+            timerInterval = setInterval(() => {
+                if(!isPaused) {
+                    seconds++;
+                    let m = Math.floor(seconds / 60).toString().padStart(2, '0');
+                    let s = (seconds % 60).toString().padStart(2, '0');
+                    document.getElementById('timer').innerText = `${m}:${s}`;
+                }
+            }, 1000);
+        };
+
+        const togglePause = () => {
+            isPaused = !isPaused;
+            const grid = document.getElementById('sudoku-grid');
+            grid.style.filter = isPaused ? 'blur(15px)' : 'none';
+            document.getElementById('pause-icon').setAttribute('data-lucide', isPaused ? 'play' : 'pause');
+            lucide.createIcons();
+        };
+
+        // Initialize Numpad
+        const numpad = document.getElementById('numpad');
+        for(let i=1; i<=9; i++) {
+            const btn = document.createElement('button');
+            btn.classList.add('num-btn');
+            btn.innerText = i;
+            btn.onclick = () => inputNumber(i);
+            numpad.appendChild(btn);
+        }
+
+        // Action Handlers
+        const eraseCell = () => inputNumber(0);
+        const undoMove = () => {
+            if(undoStack.length === 0) {
+                alert('No moves to undo.');
+                return;
+            }
+            const {r, c, prev} = undoStack.pop();
+            displayGrid[r][c] = prev;
+
+            const cellEl = document.querySelectorAll('.cell')[r * 9 + c];
+            cellEl.innerText = prev === 0 ? '' : prev;
+
+            // Re-check mistake highlighting on undo
+            const highlightOn = document.getElementById('toggle-mistakes').classList.contains('on');
+            if(highlightOn && prev !== 0 && prev !== solution[r][c]) {
+                cellEl.classList.add('error');
+            } else {
+                cellEl.classList.remove('error');
+            }
+        };
+        const getHint = () => {
+            if(!selectedCell) return;
+            const {r, c} = selectedCell;
+            inputNumber(solution[r][c]);
+        };
+
+        // Boot
+        window.onload = () => {
+            initThree();
+            lucide.createIcons();
+
+            const sfxSlider = document.getElementById('sfx-volume');
+            const musicSlider = document.getElementById('music-volume');
+            const sfxToggle = document.getElementById('toggle-sfx');
+
+            const storedSfxEnabled = localStorage.getItem('sfxEnabled');
+            if (sfxToggle && storedSfxEnabled === 'false') {
+                sfxToggle.classList.remove('on');
+            }
+
+            if (sfxSlider) {
+                sfxSlider.value = Number(localStorage.getItem('sfxVolume') ?? 80);
+                sfxSlider.oninput = (e) => setSfxVolume(e.target.value);
+            }
+            if (musicSlider) {
+                musicSlider.value = Number(localStorage.getItem('musicVolume') ?? 50);
+                musicSlider.oninput = (e) => setMusicVolume(e.target.value);
+            }
+
+            // Ensure music can start after a user gesture (some browsers block autoplay)
+            const attemptPlay = () => {
+                if (ytPlayer && ytPlayer.playVideo) {
+                    ytPlayer.playVideo();
+                    window.removeEventListener('click', attemptPlay);
+                }
+            };
+            window.addEventListener('click', attemptPlay);
+        };
+    </script>
+
+    <iframe id="bg-music" style="display:none;" allow="autoplay"></iframe>
+</body>
+</html>
